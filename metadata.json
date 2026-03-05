@@ -1,0 +1,5 @@
+{
+  "name": "SAPA",
+  "description": "A fully functioning statistical analysis platform and Homebrew tap. Features a real-time math engine, Public API endpoints, and modernized developer tools.",
+  "requestFramePermissions": []
+}

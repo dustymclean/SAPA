@@ -1,0 +1,62 @@
+name: homebrew-pspp
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+  schedule:
+    - cron: '13 4 * * *'
+
+jobs:
+  build:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        psppversion: [stable, head]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Check PSPP version
+        run: |
+          FORMULA_VERSION=$(grep -E 'url "https://ftpmirror.gnu.org/gnu/pspp/pspp-.*\.tar\.gz"' Formula/pspp.rb | sed -E 's/.*pspp-(.*)\.tar\.gz.*/\1/')
+          echo "Formula version: $FORMULA_VERSION"
+          LATEST_VERSION=$(curl -s https://ftp.gnu.org/gnu/pspp/ | grep -oE 'pspp-[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz' | sed -E 's/pspp-(.*)\.tar\.gz/\1/' | sort -V | tail -n 1)
+          echo "Latest stable version: $LATEST_VERSION"
+          if [ "$FORMULA_VERSION" != "$LATEST_VERSION" ]; then
+            echo "::error::Version mismatch! Formula has $FORMULA_VERSION, but latest stable is $LATEST_VERSION."
+            exit 1
+          fi
+
+      - name: Install spread-sheet-widget
+        run: brew install --verbose --build-from-source Formula/spread-sheet-widget.rb
+
+      - name: Build pspp-stable
+        if: matrix.psppversion == 'stable'
+        run: brew install --verbose --keep-tmp --build-from-source Formula/pspp.rb
+
+      - name: Build pspp-head
+        if: matrix.psppversion == 'head'
+        run: brew install --verbose --keep-tmp --head --build-from-source Formula/pspp.rb
+
+      - name: Archive testsuite.log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testsuite-${{ matrix.psppversion }}.log
+          path: "/private/tmp/pspp-*/pspp-*/tests/testsuite.log"
+
+      - name: Archive config.log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: config-${{ matrix.psppversion }}.log
+          path: "/private/tmp/pspp-*/pspp-*/config.log"
